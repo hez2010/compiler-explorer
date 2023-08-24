@@ -51,6 +51,7 @@ class DotNetCompiler extends BaseCompiler {
     private readonly langVersion: string;
     private readonly corerunPath: string;
     private readonly disassemblyLoaderPath: string;
+    private readonly sdkMajorVersion: number;
 
     private versionString: string;
 
@@ -62,6 +63,7 @@ class DotNetCompiler extends BaseCompiler {
 
         const parts = this.sdkVersion.split('.');
         this.targetFramework = `net${parts[0]}.${parts[1]}`;
+        this.sdkMajorVersion = Number(parts[0]);
 
         this.buildConfig = this.compilerProps<string>(`compiler.${this.compiler.id}.buildConfig`);
         this.clrBuildDir = this.compilerProps<string>(`compiler.${this.compiler.id}.clrDir`);
@@ -366,13 +368,10 @@ class DotNetCompiler extends BaseCompiler {
                 return compilerResult;
             }
 
-            const envVarFilePath = path.join(programDir, '.env');
-            await fs.writeFile(envVarFilePath, envVarFileContents.join('\n'));
-
             const corerunResult = await this.runCorerunForDisasm(
                 execOptions,
                 this.clrBuildDir,
-                envVarFilePath,
+                envVarFileContents,
                 programDllPath,
                 corerunArgs,
                 this.getOutputFilename(programDir, this.outputFilebase),
@@ -430,7 +429,7 @@ class DotNetCompiler extends BaseCompiler {
 
     async checkRuntimeVersion(execOptions: ExecutionOptions) {
         if (!this.versionString) {
-            this.versionString = '// dotnet runtime ';
+            this.versionString = '// dotnet ';
 
             const versionFilePath = `${this.clrBuildDir}/version.txt`;
             if (fs.existsSync(versionFilePath)) {
@@ -443,20 +442,35 @@ class DotNetCompiler extends BaseCompiler {
     }
 
     async runCorerunForDisasm(
-        execOptions: ExecutionOptions,
+        execOptions: ExecutionOptions & {env: Record<string, string>},
         coreRoot: string,
-        envPath: string,
+        envVars: string[],
         dllPath: string,
         options: string[],
         outputPath: string,
     ) {
         await this.checkRuntimeVersion(execOptions);
+        const programDir = path.dirname(dllPath);
 
-        const corerunOptions = ['--clr-path', coreRoot, '--env', envPath].concat([
-            ...options,
-            this.disassemblyLoaderPath,
-            dllPath,
-        ]);
+        const corerunOptions = ['--clr-path', coreRoot];
+
+        // net6.0 doesn't use --env
+        if (this.sdkMajorVersion === 6) {
+            for (const envVar in envVars) {
+                const [name, value] = envVar.split('=');
+                if (name && value) {
+                    execOptions.env[name] = value;
+                }
+            }
+        }
+        // net7.0 and above use --env
+        else {
+            const envFilePath = path.join(programDir, '.env');
+            await fs.writeFile(envFilePath, envVars.join('\n'));
+            corerunOptions.push('--env', envFilePath);
+        }
+
+        corerunOptions.push(...options, this.disassemblyLoaderPath, dllPath);
         const compilerExecResult = await this.exec(this.corerunPath, corerunOptions, execOptions);
         const result = this.transformToCompilationResult(compilerExecResult, dllPath);
 
