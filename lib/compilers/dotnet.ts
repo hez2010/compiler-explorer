@@ -301,22 +301,24 @@ class DotNetCompiler extends BaseCompiler {
         const toolOptions: string[] = [
             '--codegenopt',
             this.sdkMajorVersion === 6 ? 'NgenDisasm=*' : 'JitDisasm=*',
-            '--codegenopt',
-            this.sdkMajorVersion < 8 ? 'JitDiffableDasm=1' : 'JitDisasmDiffable=1',
             '--parallelism', '1',
         ];
+        if (this.sdkMajorVersion < 8) {
+            toolOptions.push('--codegenopt', 'JitDiffableDasm=1');
+        }
         const toolSwitches: string[] = [];
         const programDir = path.dirname(inputFilename);
         const programOutputPath = path.join(programDir, 'bin', this.buildConfig, this.targetFramework);
         const programDllPath = path.join(programOutputPath, 'CompilerExplorer.dll');
-        // prettier-ignore
         const envVarFileContents = [
             'DOTNET_EnableWriteXorExecute=0',
             'DOTNET_JitDisasm=*',
             'DOTNET_JitDisasmAssemblies=CompilerExplorer',
             'DOTNET_TieredCompilation=0',
-            this.sdkMajorVersion < 8 ? 'DOTNET_JitDiffableDasm=1' : 'DOTNET_JitDisasmDiffable=1',
         ];
+        if (this.sdkMajorVersion < 8) {
+            envVarFileContents.push('DOTNET_JitDiffableDasm=1');
+        }
         let isAot = false;
         let isCrossgen2 = this.sdkMajorVersion === 6;
 
