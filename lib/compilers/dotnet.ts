@@ -981,8 +981,6 @@ do()
             '--scanreflection',
             '--nosinglewarnassembly:CompilerExplorer',
             '--generateunmanagedentrypoints:System.Private.CoreLib',
-            '--notrimwarn',
-            '--noaotwarn',
         ].concat(options);
 
         if (!buildToBinary) {

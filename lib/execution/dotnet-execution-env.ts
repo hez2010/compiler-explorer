@@ -24,9 +24,9 @@
 
 import path from 'node:path';
 
-import {BasicExecutionResult, ExecutableExecutionOptions} from '../../types/execution/execution.interfaces.js';
+import { BasicExecutionResult, ExecutableExecutionOptions } from '../../types/execution/execution.interfaces.js';
 import * as utils from '../utils.js';
-import {LocalExecutionEnvironment} from './base-execution-env.js';
+import { LocalExecutionEnvironment } from './base-execution-env.js';
 
 export const AssemblyName = 'CompilerExplorer';
 
@@ -36,6 +36,7 @@ export type DotnetExtraConfiguration = {
     langVersion: string;
     targetFramework: string;
     corerunPath: string;
+    runtimeName: string;
 };
 
 export class DotnetExecutionEnvironment extends LocalExecutionEnvironment {
@@ -47,7 +48,7 @@ export class DotnetExecutionEnvironment extends LocalExecutionEnvironment {
         executable: string,
         executeParameters: ExecutableExecutionOptions,
         homeDir: string,
-        extraConfiguration: any,
+        extraConfiguration: DotnetExtraConfiguration,
     ): Promise<BasicExecutionResult> {
         const programDir = path.dirname(executable);
         const programOutputPath = path.join(
@@ -70,13 +71,19 @@ export class DotnetExecutionEnvironment extends LocalExecutionEnvironment {
         execOptions.input = executeParameters.stdin;
         const execArgs = ['-p', 'System.Runtime.TieredCompilation=false', programDllPath, ...executeParameters.args];
         try {
-            return this.execBinaryMaybeWrapped(
+            const result = await this.execBinaryMaybeWrapped(
                 extraConfiguration.corerunPath,
                 execArgs,
                 execOptions,
                 executeParameters,
                 homeDir,
             );
+            result.stdout = result.stdout
+                ? utils.parseOutput(`Runtime for execution: ${extraConfiguration.runtimeName} ${await this.getRuntimeVersion()}\n\n${result.stdout
+                    .map(o => o.text)
+                    .reduce((a, n) => `${a}\n${n}`, '')}`)
+                : [];
+            return result;
         } catch (err: any) {
             if (err.code && err.stderr) {
                 return utils.processExecutionResult(err);
