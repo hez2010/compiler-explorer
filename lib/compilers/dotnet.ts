@@ -581,9 +581,7 @@ do()
         const programDllPath = path.join(programOutputPath, 'CompilerExplorer.dll');
         const envVarFileContents = [
             'DOTNET_EnableWriteXorExecute=0',
-            ...Object.entries(execOptions.env)
-                .filter(([key]) => key.startsWith('DOTNET_'))
-                .map(([key, value]) => `${key}=${value}`),
+            ...Object.entries(execOptions.env).map(([key, value]) => `${key}=${value}`),
         ];
         const isIlDasm = this.compiler.group === 'dotnetildasm';
         const isIlSpy = this.compiler.group === 'dotnetilspy';
